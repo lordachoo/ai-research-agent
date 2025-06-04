@@ -22,25 +22,25 @@ A customizable AI agent that can be trained on documents to become an expert on 
 
 ## Feature Screenshots
 
-### Chat
+### Add Document
 
-![Chat](screenshots/chat.png)
+![Add Document](screenshots/ai-research-agent-add-document.png)
 
-### Knowledge Base
+### Add URL Content
 
-![Knowledge Base](screenshots/knowledge_base.png)
+![Add URL Content](screenshots/ai-research-agent-add-url-content.png)
+
+### Knowledge Base Search
+
+![Knowledge Base](screenshots/ai-research-agent-knowledge-base-search.png)
 
 ### Scheduled Tasks
 
-![Scheduled Tasks](screenshots/scheduled_tasks.png)
+![Scheduled Tasks](screenshots/ai-research-agent-schedules.png)
 
-### Sources
+### System Logs
 
-![Sources](screenshots/sources.png)
-
-### Logs
-
-![Logs](screenshots/logs.png)
+![Logs](screenshots/ai-research-agent-system-logs.png)
 
 ## Installation
 
@@ -306,16 +306,17 @@ ai-research-agent/
 │   ├── schedulers/
 │   │   └── source_scheduler.py # Scheduled source checking
 │   ├── ui/
-│   │   ├── streamlit_app.py # Streamlit web interface
 │   │   └── launcher.py      # Web UI launcher
 │   ├── api.py               # FastAPI interface
 │   └── main.py              # CLI interface
-├── knowledge_base/          # Default storage location
+├── knowledge_base/          # Default storage location (Created first time you run the app)
 ├── .env.example             # Environment variables template
 ├── requirements.txt         # Dependencies
 ├── sample_config.json       # Example source configuration
 ├── add_docs.sh              # Convenience script for adding local documents
 └── README.md                # This file
+└── example_schedule_config-toFile.json                # Example schedule configuration to file
+└── example_schedule_config-addToKnowledgeBase.json    # Example schedule configuration to add to knowledge base
 ```
 
 ## Customization
