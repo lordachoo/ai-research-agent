@@ -1,0 +1,4 @@
+#!/bin/bash
+# $1 The Prompt
+source .env
+source venv/bin/activate && python -m app.main query "$1"

@@ -1,0 +1,38 @@
+{
+  "sources": [
+    {
+      "source_id": "arxiv_ai_research",
+      "source_type": "arxiv",
+      "search_query": "artificial intelligence",
+      "categories": ["cs.AI", "cs.CL", "cs.CV", "cs.LG"],
+      "interval_hours": 24,
+      "max_results": 10,
+      "metadata": {
+        "topic": "AI Research",
+        "priority": "high"
+      }
+    },
+    {
+      "source_id": "google_research_blog",
+      "source_type": "url",
+      "url": "https://ai.googleblog.com/",
+      "interval_minutes": 1440,
+      "max_depth": 1,
+      "metadata": {
+        "topic": "Google AI Research",
+        "priority": "medium"
+      }
+    },
+    {
+      "source_id": "openai_blog",
+      "source_type": "url",
+      "url": "https://openai.com/blog",
+      "interval_minutes": 1440,
+      "max_depth": 1,
+      "metadata": {
+        "topic": "OpenAI Research",
+        "priority": "high"
+      }
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+.env
+docs
+knowledge_base/
+tasks_out/
+
+# GENERIC
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Flask
+instance/
+.webassets-cache
+
+# Environment variables
+.env
+.venv
+.flaskenv
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Image storage - where downloaded images are stored
+storage/
+
+# Logs
+logs/
+*.log
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Project specific
+tmp/
+.coverage
+htmlcov/
+
+# My stuff
+.venv*
+venv*

@@ -1,0 +1,5 @@
+#!/bin/bash
+# $1 The path to the file -- ./example_schedule_config-addToKnowledgeBase.json
+source .env
+source venv/bin/activate
+USER_AGENT="CascadeAI_Scheduler/1.0" python -m app.main schedule $1
