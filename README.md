@@ -73,6 +73,32 @@ cp .env.example .env
 
 ## Usage
 
+### Web UI Usage
+
+The AI Research Agent includes a user-friendly web interface built with FastAPI and HTML templates:
+
+```bash
+python -m app.main web --port 8000 --reload
+```
+
+Once started, access the UI by opening `http://localhost:8000` in your browser.
+
+Additional options:
+- `--host`: Host address to bind to (default: "0.0.0.0")
+- `--port`: Port to run the server on (default: 8000)
+- `--reload`: Enable auto-reload on code changes
+- `--log-level`: Log level for the server (default: "info")
+
+The web interface provides access to all core agent features:
+
+- **Chat**: Interact with the agent and query the knowledge base using a chat interface
+- **Add Document**: Upload and process local documents (PDF, DOCX, TXT, MD, CSV)
+- **Add URL**: Fetch and process content from web URLs
+- **Schedule Tasks**: Upload configuration files to schedule tasks, and view active sources and tasks
+- **Knowledge Base**: View statistics about the knowledge base and search for content
+
+**Note on Temperature Setting**: For the web UIs and scheduled tasks, remember that setting the LLM temperature to 0.0 (in your `.env` file) is critical for deterministic outputs. This ensures consistent content hashing and reliable deduplication in the knowledge base.
+
 ### Command Line Interface
 
 The agent can be used through the command line interface for various operations:
@@ -271,32 +297,6 @@ When you send a prompt to the AI Research Agent (either via the CLI or the API),
 6.  **Response Delivery**: This final answer is returned by the `agent_executor` and then displayed to you via the CLI or API response.
 
 This flow allows the agent to dynamically decide when and how to use its knowledge base (or other tools) to best answer your questions, leveraging the reasoning capabilities of the LLM.
-
-### Web UI Usage
-
-The AI Research Agent includes a user-friendly web interface built with FastAPI and HTML templates:
-
-```bash
-python -m app.main web --port 8000 --reload
-```
-
-Once started, access the UI by opening `http://localhost:8000` in your browser.
-
-Additional options:
-- `--host`: Host address to bind to (default: "0.0.0.0")
-- `--port`: Port to run the server on (default: 8000)
-- `--reload`: Enable auto-reload on code changes
-- `--log-level`: Log level for the server (default: "info")
-
-The web interface provides access to all core agent features:
-
-- **Chat**: Interact with the agent and query the knowledge base using a chat interface
-- **Add Document**: Upload and process local documents (PDF, DOCX, TXT, MD, CSV)
-- **Add URL**: Fetch and process content from web URLs
-- **Schedule Tasks**: Upload configuration files to schedule tasks, and view active sources and tasks
-- **Knowledge Base**: View statistics about the knowledge base and search for content
-
-**Note on Temperature Setting**: For the web UIs and scheduled tasks, remember that setting the LLM temperature to 0.0 (in your `.env` file) is critical for deterministic outputs. This ensures consistent content hashing and reliable deduplication in the knowledge base.
 
 ## Project Structure
 
