@@ -116,34 +116,151 @@ class DocumentRetriever:
         Args:
             url: URL to fetch and learn from
             metadata: Optional metadata about the content
+                - max_depth: Optional[int] - maximum recursion depth for fetching linked URLs
             
         Returns:
             Status message
         """
-        try:
-            # Load the content from the URL
-            loader = WebBaseLoader(url)
-            documents = loader.load()
+        import logging
+        import hashlib
+        from urllib.parse import urlparse, urljoin
+        from bs4 import BeautifulSoup
+        import requests
+    
+        logger = logging.getLogger(__name__)
+        
+        # Extract max_depth from metadata if provided
+        max_depth = 0
+        if metadata and "max_depth" in metadata:
+            max_depth = int(metadata["max_depth"])
+            # Remove max_depth from metadata as we don't want to store it
+            metadata_copy = metadata.copy()
+            metadata_copy.pop("max_depth")
+            metadata = metadata_copy
+
+        # Create a set to track processed URLs to avoid duplicates
+        processed_urls = set()
+        results = []
+    
+        def process_url_recursive(current_url, current_depth=0, max_depth=0):
+            """Process URL and recursively process linked URLs up to max_depth"""
             
-            # Add metadata if provided
-            if metadata:
-                for doc in documents:
-                    doc.metadata.update(metadata)
-                    
-            # Add source and timestamp to metadata
-            for doc in documents:
-                doc.metadata["source"] = url
-                doc.metadata["timestamp"] = str(documents[0].metadata.get("last_modified", ""))
+            # Skip if already processed
+            if current_url in processed_urls:
+                logger.info(f"Skipping already processed URL: {current_url}")
+                return 0
+            
+            # Add to processed URLs
+            processed_urls.add(current_url)
+            
+            # Log progress with depth indication
+            depth_indicator = "  " * current_depth
+            logger.info(f"{depth_indicator}Processing URL: {current_url} (depth {current_depth}/{max_depth})")
+            
+            try:
+                # Get the URL content
+                logger.info(f"{depth_indicator}Fetching content from {current_url}")
+                loader = WebBaseLoader(current_url)
+                documents = loader.load()
                 
-            # Split the documents
-            split_docs = self.text_splitter.split_documents(documents)
-            
-            # Add the documents to the knowledge base
-            result = self.knowledge_base.add_documents(split_docs)
-            
-            return f"Successfully processed {url}: {result}"
-        except Exception as e:
-            return f"Error processing {url}: {str(e)}"
+                # Calculate content hash for deduplication
+                content = documents[0].page_content if documents else ""
+                content_length = len(content)
+                content_hash = hashlib.md5(content.encode()).hexdigest()
+                logger.info(f"{depth_indicator}Content length: {content_length} characters, hash: {content_hash[:8]}...")
+                
+                # Set metadata for documents
+                url_meta = {}
+                if metadata:
+                    url_meta.update(metadata)
+                
+                # Always set document_id to URL for deduplication
+                url_meta["document_id"] = current_url
+                url_meta["content_hash"] = content_hash
+                url_meta["content_length"] = content_length
+                
+                # Add metadata to documents
+                for doc in documents:
+                    doc.metadata.update(url_meta)
+                
+                # Process the documents
+                logger.info(f"{depth_indicator}Splitting content into chunks...")
+                text_splitter = RecursiveCharacterTextSplitter(
+                    chunk_size=1000,
+                    chunk_overlap=200
+                )
+                split_docs = text_splitter.split_documents(documents)
+                logger.info(f"{depth_indicator}Created {len(split_docs)} document chunks")
+                
+                # Add to knowledge base
+                logger.info(f"{depth_indicator}Adding documents to knowledge base...")
+                result = self.knowledge_base.add_documents(split_docs)
+                logger.info(f"{depth_indicator}Knowledge base update complete: {result}")
+                
+                # Don't process links if we've reached max depth
+                processed_count = 1  # Count this URL
+                if current_depth < max_depth:
+                    # Extract links for further processing
+                    try:
+                        # Parse the URL to get domain
+                        parsed_url = urlparse(current_url)
+                        base_domain = parsed_url.netloc
+                        
+                        logger.info(f"{depth_indicator}Extracting links from {current_url}...")
+                        # Get HTML content with requests
+                        response = requests.get(current_url)
+                        soup = BeautifulSoup(response.content, 'html.parser')
+                        
+                        # Find all links
+                        links = soup.find_all('a', href=True)
+                        same_domain_links = []
+                        
+                        # Filter links to same domain only
+                        for link in links:
+                            href = link['href']
+                            abs_url = urljoin(url, href)
+                            parsed_link = urlparse(abs_url)
+                            
+                            # Only include links from the same domain
+                            if parsed_link.netloc == base_domain:
+                                same_domain_links.append(abs_url)
+                        
+                        # Process up to 10 links from same domain
+                        unique_links = list(set(same_domain_links))[:10]
+                        logger.info(f"{depth_indicator}Found {len(links)} total links, {len(same_domain_links)} same-domain links, processing {len(unique_links)} unique links")
+                        
+                        # Recursively process each link
+                        for i, link in enumerate(unique_links):
+                            if link not in processed_urls:
+                                logger.info(f"{depth_indicator}Processing link {i+1}/{len(unique_links)}: {link}")
+                                processed_count += process_url_recursive(
+                                    link, current_depth + 1, max_depth)
+                    except Exception as e:
+                        error_msg = str(e)
+                        logger.error(f"{depth_indicator}Error extracting links from {current_url}: {error_msg}")
+                        
+                return processed_count
+            except Exception as e:
+                error_msg = str(e)
+                logger.error(f"{depth_indicator}Error processing URL {current_url}: {error_msg}")
+                return 0
+        
+        # Check if max_depth is specified in metadata
+        max_depth = 0
+        if metadata and "max_depth" in metadata:
+            max_depth = int(metadata["max_depth"])
+        
+        logger.info(f"Starting recursive URL processing with max_depth={max_depth}")
+        
+        # Process the URL recursively
+        total_processed = process_url_recursive(url, 0, max_depth)
+        
+        logger.info(f"URL processing complete. Processed {total_processed} total pages.")
+        
+        if total_processed > 1:
+            return f"Successfully processed {url} and {total_processed-1} linked pages."
+        else:
+            return f"Successfully processed {url}."
             
     def add_recursive_url_content(self, base_url: str, max_depth: int = 2, metadata: Optional[Dict[str, Any]] = None) -> str:
         """

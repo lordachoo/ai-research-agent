@@ -2,6 +2,9 @@
 
 A customizable AI agent that can be trained on documents to become an expert on specific topics for research. The agent can also be scheduled to periodically check specific sources (like websites or arXiv) for new information.
 
+- Supports offline (ollama models, embedding models)
+- Supports OpenAI + ollama embeds
+
 ## Features
 
 - **Document Training**: Train the agent on various document types (PDF, DOCX, TXT, MD, CSV)
@@ -11,10 +14,33 @@ A customizable AI agent that can be trained on documents to become an expert on 
 - **Knowledge Retrieval**: Query the agent for information it has learned
 - **RESTful API**: Interact with the agent through a comprehensive API
 - **Command-Line Interface**: Use the agent directly from the terminal
+- **Web Interface**: User-friendly Streamlit web UI for interacting with the agent
 - **Vector Database Storage**: Efficient storage and retrieval of knowledge
 - **Robust Knowledge Base Deduplication**: Prevents duplicate entries and intelligently updates existing content based on URL and content changes (using URL as ID and summary content hash).
 - **LLM Temperature Setting for Determinism**: Set the LLM temperature to 0.0 for deterministic outputs, ensuring consistent content hashing and deduplication.
 - **Improved Scheduled Task Handling for Knowledge Base Additions**: Automatically handles deduplication for scheduled tasks, ensuring the knowledge base remains up-to-date without redundant entries.
+
+## Feature Screenshots
+
+### Chat
+
+![Chat](screenshots/chat.png)
+
+### Knowledge Base
+
+![Knowledge Base](screenshots/knowledge_base.png)
+
+### Scheduled Tasks
+
+![Scheduled Tasks](screenshots/scheduled_tasks.png)
+
+### Sources
+
+![Sources](screenshots/sources.png)
+
+### Logs
+
+![Logs](screenshots/logs.png)
 
 ## Installation
 
@@ -29,17 +55,12 @@ cd ai-research-agent
 pip install -r requirements.txt
 ```
 
-3. Install Playwright for advanced web scraping (optional):
-```bash
-python -m playwright install
-```
-
-4. Copy the example .env file and configure it:
+3. Copy the example .env file and configure it:
 ```bash
 cp .env.example .env
 ```
 
-5. Edit `.env` with your API keys (e.g., OpenAI) and other configuration options. Key settings include:
+4. Edit `.env` with your API keys (e.g., OpenAI) and other configuration options. Key settings include:
     - `LLM_PROVIDER`: (e.g., `ollama`, `openai`)
     - `MODEL_NAME` or `OLLAMA_MODEL_NAME`: Specify the LLM model.
     - `OLLAMA_BASE_URL`: If using Ollama.
@@ -61,6 +82,9 @@ python -m app.main schedule sample_config.json
 
 # Start the API server
 python -m app.main api --port 8000
+
+# Start the Web UI
+python -m app.main web --port 8501
 ```
 
 ### Adding Information to the Knowledge Base
@@ -244,6 +268,32 @@ When you send a prompt to the AI Research Agent (either via the CLI or the API),
 
 This flow allows the agent to dynamically decide when and how to use its knowledge base (or other tools) to best answer your questions, leveraging the reasoning capabilities of the LLM.
 
+### Web UI Usage
+
+The AI Research Agent includes a user-friendly web interface built with FastAPI and HTML templates:
+
+```bash
+python -m app.main web --port 8000 --reload
+```
+
+Once started, access the UI by opening `http://localhost:8000` in your browser.
+
+Additional options:
+- `--host`: Host address to bind to (default: "0.0.0.0")
+- `--port`: Port to run the server on (default: 8000)
+- `--reload`: Enable auto-reload on code changes
+- `--log-level`: Log level for the server (default: "info")
+
+The web interface provides access to all core agent features:
+
+- **Chat**: Interact with the agent and query the knowledge base using a chat interface
+- **Add Document**: Upload and process local documents (PDF, DOCX, TXT, MD, CSV)
+- **Add URL**: Fetch and process content from web URLs
+- **Schedule Tasks**: Upload configuration files to schedule tasks, and view active sources and tasks
+- **Knowledge Base**: View statistics about the knowledge base and search for content
+
+**Note on Temperature Setting**: For the web UIs and scheduled tasks, remember that setting the LLM temperature to 0.0 (in your `.env` file) is critical for deterministic outputs. This ensures consistent content hashing and reliable deduplication in the knowledge base.
+
 ## Project Structure
 
 ```
@@ -255,6 +305,9 @@ ai-research-agent/
 │   │   └── retriever.py     # Document loading and retrieval
 │   ├── schedulers/
 │   │   └── source_scheduler.py # Scheduled source checking
+│   ├── ui/
+│   │   ├── streamlit_app.py # Streamlit web interface
+│   │   └── launcher.py      # Web UI launcher
 │   ├── api.py               # FastAPI interface
 │   └── main.py              # CLI interface
 ├── knowledge_base/          # Default storage location
@@ -310,7 +363,7 @@ scheduler.add_custom_source(
 ## Requirements
 
 - Python 3.8+
-- OpenAI API key
+- OpenAI API key or Ollama
 - Disk space for vector database storage
 
 ## License

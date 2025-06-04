@@ -1,0 +1,157 @@
+{% extends "layout.html" %}
+
+{% block title %}AI Research Agent - Scheduler{% endblock %}
+
+{% block scripts %}
+<script>
+    function toggleFullJson(button, targetId) {
+        const target = document.getElementById(targetId);
+        if (target.style.display === 'none') {
+            target.style.display = 'block';
+        } else {
+            target.style.display = 'none';
+        }
+    }
+</script>
+{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Scheduler</h1>
+
+{% if message %}
+    <div class="alert alert-{{ message_type }}">
+        {{ message }}
+    </div>
+{% endif %}
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5>Upload Configuration File</h5>
+    </div>
+    <div class="card-body">
+        <form method="post" action="/ui/scheduler/upload" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="config_file" class="form-label">JSON Configuration File</label>
+                <input type="file" class="form-control" id="config_file" name="config_file" accept=".json" required>
+                <div class="form-text">Upload a JSON file with source and task configurations</div>
+            </div>
+            <button type="submit" class="btn btn-primary">Upload and Schedule</button>
+        </form>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Active Sources Section -->
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Active Sources</h5>
+            </div>
+            <div class="card-body">
+                {% if sources %}
+                    <div class="accordion" id="sourcesAccordion">
+                        {% for source_id, source in sources.items() %}
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="heading-source-{{ loop.index }}">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                                            data-bs-target="#collapse-source-{{ loop.index }}" aria-expanded="false" 
+                                            aria-controls="collapse-source-{{ loop.index }}">
+                                        <strong>{{ source_id }}</strong> - {{ source.get('source_type', 'Unknown') }}
+                                    </button>
+                                </h2>
+                                <div id="collapse-source-{{ loop.index }}" class="accordion-collapse collapse" 
+                                    aria-labelledby="heading-source-{{ loop.index }}" data-bs-parent="#sourcesAccordion">
+                                    <div class="accordion-body">
+                                        <pre class="bg-light p-2">{{ source|tojson(indent=2) }}</pre>
+                                        <form method="post" action="/ui/scheduler/source/remove" class="mt-2">
+                                            <input type="hidden" name="source_id" value="{{ source_id }}">
+                                            <button type="submit" class="btn btn-sm btn-danger">Remove Source</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">No active sources</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Tasks Section -->
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Active Tasks</h5>
+            </div>
+            <div class="card-body">
+                {% if tasks %}
+                    <div class="accordion" id="tasksAccordion">
+                        {% for task_id, task in tasks.items() %}
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="heading-task-{{ loop.index }}">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                                            data-bs-target="#collapse-task-{{ loop.index }}" aria-expanded="false" 
+                                            aria-controls="collapse-task-{{ loop.index }}">
+                                        <strong>{{ task_id }}</strong>
+                                    </button>
+                                </h2>
+                                <div id="collapse-task-{{ loop.index }}" class="accordion-collapse collapse" 
+                                    aria-labelledby="heading-task-{{ loop.index }}" data-bs-parent="#tasksAccordion">
+                                    <div class="accordion-body">
+                                        <dl>
+                                            <dt>Type:</dt>
+                                            <dd>{{ task.type }}</dd>
+                                            
+                                            <dt>URL:</dt>
+                                            <dd>{{ task.url }}</dd>
+                                            
+                                            <dt>Schedule:</dt>
+                                            <dd>
+                                                {% if task.schedule_info %}
+                                                    {{ task.schedule_info }}
+                                                {% elif task.interval_minutes %}
+                                                    Every {{ task.interval_minutes }} minutes
+                                                {% elif task.cron_expression %}
+                                                    {{ task.cron_expression }}
+                                                {% else %}
+                                                    Unknown schedule
+                                                {% endif %}
+                                            </dd>
+                                            
+                                            <dt>Prompt:</dt>
+                                            <dd>
+                                                <pre class="bg-light p-2">{{ task.prompt_template|truncate(300) }}</pre>
+                                            </dd>
+                                            
+                                            <dt>Output Action:</dt>
+                                            <dd>{{ task.output_action.type if task.output_action and task.output_action.type else "Unknown" }}</dd>
+                                            
+                                            <dt>Added At:</dt>
+                                            <dd>{{ task.added_at }}</dd>
+                                            
+                                            <dt>Job ID:</dt>
+                                            <dd>{{ task.job_id }}</dd>
+                                            
+                                            <dt>Full Details:</dt>
+                                            <dd><button class="btn btn-sm btn-outline-info" type="button" onclick="toggleFullJson(this, 'json-{{ task_id }}')">Show/Hide</button></dd>
+                                            <dd><pre id="json-{{ task_id }}" class="bg-light p-2 mt-2" style="display: none;">{{ task|tojson(indent=2) }}</pre></dd>
+                                        </dl>
+                                        <form method="post" action="/ui/scheduler/task/remove" class="mt-2">
+                                            <input type="hidden" name="task_id" value="{{ task_id }}">
+                                            <button type="submit" class="btn btn-sm btn-danger">Remove Task</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">No active tasks</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

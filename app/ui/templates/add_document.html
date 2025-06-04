@@ -1,0 +1,62 @@
+{% extends "layout.html" %}
+
+{% block title %}AI Research Agent - Add Document{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Add Document to Knowledge Base</h1>
+
+{% if message %}
+    <div class="alert alert-{{ message_type }}">
+        {{ message }}
+    </div>
+{% endif %}
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form id="document-form" method="post" action="/ui/add-document" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="file" class="form-label">Select Document</label>
+                <input type="file" class="form-control" id="file" name="file" required>
+                <div class="form-text">Supported formats: PDF, DOCX, TXT, MD, CSV</div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="metadata" class="form-label">Metadata (optional JSON)</label>
+                <textarea class="form-control" id="metadata" name="metadata" rows="4" placeholder='{
+  "title": "Document Title",
+  "author": "Author Name", 
+  "source": "Source Name"
+}'></textarea>
+                <div class="form-text">Optional metadata in JSON format</div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary" id="submit-btn">
+                Upload and Process Document
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        $('#document-form').submit(function() {
+            try {
+                // Validate JSON if provided
+                const metadata = $('#metadata').val();
+                if (metadata && metadata.trim() !== '') {
+                    JSON.parse(metadata);
+                }
+                
+                $('#submit-btn').html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...');
+                $('#submit-btn').prop('disabled', true);
+                return true;
+            } catch (e) {
+                alert('Invalid JSON in metadata field. Please correct the format.');
+                return false;
+            }
+        });
+    });
+</script>
+{% endblock %}

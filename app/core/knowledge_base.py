@@ -219,19 +219,34 @@ class KnowledgeBase:
         Returns:
             Number of documents
         """
-        return len(self.vector_store.get()["ids"])
-        
+        try:
+            collection_data = self.vector_store.get()
+            return len(collection_data["ids"]) if collection_data["ids"] else 0
+        except Exception as e:
+            return 0
+            
     def get_collection_stats(self) -> Dict[str, Any]:
         """
         Get statistics about the collection.
         
         Returns:
-            Dictionary with collection statistics
+            Dictionary with collection statistics including document count and chunk count
         """
         try:
             collection_data = self.vector_store.get()
+            # Count total document IDs (chunks)
+            total_chunks = len(collection_data["ids"]) if "ids" in collection_data and collection_data["ids"] else 0
+            
+            # Get unique document sources (original documents) by counting unique document_id values
+            unique_docs = set()
+            if total_chunks > 0 and "metadatas" in collection_data and collection_data["metadatas"]:  
+                for metadata in collection_data["metadatas"]:
+                    if metadata and "document_id" in metadata:
+                        unique_docs.add(metadata["document_id"])
+            
             stats = {
-                "document_count": len(collection_data["ids"]),
+                "document_count": len(unique_docs),
+                "chunk_count": total_chunks,
                 "collection_name": self.collection_name,
                 "persist_directory": self.persist_directory,
                 "embedding_model": self.embedding_model_name,
@@ -239,4 +254,4 @@ class KnowledgeBase:
             }
             return stats
         except Exception as e:
-            return {"error": str(e)}
+            return {"error": str(e), "document_count": 0, "chunk_count": 0}

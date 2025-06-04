@@ -1,0 +1,67 @@
+{% extends "layout.html" %}
+
+{% block title %}AI Research Agent - Knowledge Base{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Knowledge Base</h1>
+
+<div class="kb-stats mb-4">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Documents</h5>
+                    <h2 class="card-text">{{ kb_stats.document_count|default('0') }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Chunks</h5>
+                    <h2 class="card-text">{{ kb_stats.chunk_count|default('0') }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="text-center mt-3">
+        <a href="/ui/knowledge-base?refresh=1" class="btn btn-outline-primary">
+            <i class="bi bi-arrow-clockwise"></i> Refresh Stats
+        </a>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5>Search Knowledge Base</h5>
+    </div>
+    <div class="card-body">
+        <form method="get" action="/ui/knowledge-base">
+            <div class="input-group mb-3">
+                <input type="text" class="form-control" name="search" placeholder="Enter search term..." value="{{ search_term|default('') }}">
+                <button class="btn btn-outline-primary" type="submit">Search</button>
+            </div>
+        </form>
+        
+        {% if search_results %}
+            <h6 class="mt-4">Search Results:</h6>
+            {% for doc in search_results %}
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <strong>{{ doc.metadata.title|default('Document') }}</strong>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Source:</strong> {{ doc.metadata.document_id|default('Unknown') }}</p>
+                        <p><strong>Content Hash:</strong> {{ doc.metadata.content_hash|default('Unknown') }}</p>
+                        <p><strong>Content:</strong></p>
+                        <div class="border p-2 bg-light">{{ doc.content }}</div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% elif search_term %}
+            <div class="alert alert-info mt-3">No results found for "{{ search_term }}"</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

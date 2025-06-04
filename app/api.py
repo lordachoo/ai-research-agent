@@ -6,8 +6,10 @@ This module provides a FastAPI interface for interacting with the agent.
 import os
 import json
 from typing import List, Dict, Any, Optional
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Query
-from fastapi.responses import JSONResponse
+
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Query, Request
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 import uvicorn
 
@@ -61,11 +63,16 @@ def get_agent():
         
         # Initialize agent
         model_name = os.getenv("MODEL_NAME", "gpt-3.5-turbo-0125")
+        llm_provider = os.getenv("LLM_PROVIDER", "openai")
+        
         research_agent = ResearchAgent(
             agent_name=os.getenv("AGENT_NAME", "Research Assistant"),
             knowledge_base=kb,
             model_name=model_name,
             temperature=float(os.getenv("TEMPERATURE", "0.1")),
+            llm_provider=llm_provider,
+            ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+            ollama_model_name=os.getenv("OLLAMA_MODEL_NAME", "llama3:latest")
         )
     return research_agent
 
@@ -80,9 +87,9 @@ def get_scheduler():
 
 
 # Define API routes
-@app.get("/")
-async def root():
-    return {"message": "AI Research Agent API"}
+@app.get("/", response_class=HTMLResponse)
+async def root(request: Request):
+    return RedirectResponse(url="/ui/", status_code=303)
 
 
 @app.post("/query")
@@ -256,6 +263,17 @@ async def reset_kb(agent: ResearchAgent = Depends(get_agent)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# Import and include the web UI router
+from app.ui.web_ui import router as web_ui_router
+app.include_router(web_ui_router)
+
+# Mount static files directory if it exists
+static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app", "ui", "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+# Note: Root route is already defined at the top of the file
 
 # Run the API if this file is executed directly
 if __name__ == "__main__":

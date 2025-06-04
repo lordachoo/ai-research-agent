@@ -1,0 +1,168 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>Real-Time Logs</h2>
+            <p>View the system logs in real-time. This is useful for monitoring URL processing, knowledge base operations, and system activities.</p>
+            
+            <div class="d-flex justify-content-between mb-2">
+                <div>
+                    <button class="btn btn-sm btn-primary" id="toggleAutoScroll">Auto-scroll: <span id="autoScrollStatus">ON</span></button>
+                    <button class="btn btn-sm btn-secondary" id="clearLogs">Clear Display</button>
+                </div>
+                <div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="showInfo" checked>
+                        <label class="form-check-label" for="showInfo">INFO</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="showWarning" checked>
+                        <label class="form-check-label" for="showWarning">WARNING</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="showError" checked>
+                        <label class="form-check-label" for="showError">ERROR</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="showDebug" checked>
+                        <label class="form-check-label" for="showDebug">DEBUG</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-body bg-dark p-3" style="height: 500px; overflow-y: auto;" id="logContainer">
+                    <pre class="text-light" id="logContent" style="white-space: pre-wrap;"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Log viewer JavaScript
+    document.addEventListener('DOMContentLoaded', function() {
+        const logContent = document.getElementById('logContent');
+        const logContainer = document.getElementById('logContainer');
+        const toggleAutoScrollBtn = document.getElementById('toggleAutoScroll');
+        const autoScrollStatus = document.getElementById('autoScrollStatus');
+        const clearLogsBtn = document.getElementById('clearLogs');
+        const showInfo = document.getElementById('showInfo');
+        const showWarning = document.getElementById('showWarning');
+        const showError = document.getElementById('showError');
+        const showDebug = document.getElementById('showDebug');
+        
+        let nextIndex = 0;
+        let autoScroll = true;
+        let logCheckInterval = null;
+        
+        // Function to toggle auto-scroll
+        toggleAutoScrollBtn.addEventListener('click', function() {
+            autoScroll = !autoScroll;
+            autoScrollStatus.textContent = autoScroll ? 'ON' : 'OFF';
+        });
+        
+        // Function to clear logs
+        clearLogsBtn.addEventListener('click', function() {
+            logContent.innerHTML = '';
+        });
+        
+        // Function to filter logs
+        function shouldShowLog(level) {
+            if (!level) return true;
+            level = level.toUpperCase();
+            
+            if (level === 'INFO' && !showInfo.checked) return false;
+            if (level === 'WARNING' && !showWarning.checked) return false;
+            if (level === 'ERROR' && !showError.checked) return false;
+            if (level === 'DEBUG' && !showDebug.checked) return false;
+            
+            return true;
+        }
+        
+        // Function to format a log entry
+        function formatLogEntry(log) {
+            let levelClass = '';
+            
+            switch(log.level) {
+                case 'ERROR':
+                    levelClass = 'text-danger';
+                    break;
+                case 'WARNING':
+                    levelClass = 'text-warning';
+                    break;
+                case 'INFO':
+                    levelClass = 'text-info';
+                    break;
+                case 'DEBUG':
+                    levelClass = 'text-light';
+                    break;
+                default:
+                    levelClass = 'text-light';
+            }
+            
+            return `<div class="${levelClass}">${log.message}</div>`;
+        }
+        
+        // Function to fetch logs
+        function fetchLogs() {
+            fetch(`/ui/api/logs?since_index=${nextIndex}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.logs && data.logs.length > 0) {
+                        let logHtml = '';
+                        
+                        data.logs.forEach(log => {
+                            if (shouldShowLog(log.level)) {
+                                logHtml += formatLogEntry(log);
+                            }
+                        });
+                        
+                        // Append new logs
+                        if (logHtml) {
+                            logContent.innerHTML += logHtml;
+                            
+                            // Auto-scroll to bottom if enabled
+                            if (autoScroll) {
+                                logContainer.scrollTop = logContainer.scrollHeight;
+                            }
+                        }
+                        
+                        // Update next index
+                        nextIndex = data.next_index;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching logs:', error);
+                });
+        }
+        
+        // Add event listeners for filter checkboxes to reapply filtering
+        showInfo.addEventListener('change', applyFilters);
+        showWarning.addEventListener('change', applyFilters);
+        showError.addEventListener('change', applyFilters);
+        showDebug.addEventListener('change', applyFilters);
+        
+        function applyFilters() {
+            // This is a simplified implementation - in a real app you'd store the logs and reapply filters
+            // Here we'll just indicate that filtering changed
+            logContent.innerHTML += '<div class="text-secondary">-- Log filter updated --</div>';
+        }
+        
+        // Initial log fetch
+        fetchLogs();
+        
+        // Set up periodic log fetching
+        logCheckInterval = setInterval(fetchLogs, 1000);
+        
+        // Clean up on page leave
+        window.addEventListener('beforeunload', function() {
+            if (logCheckInterval) {
+                clearInterval(logCheckInterval);
+            }
+        });
+    });
+</script>
+{% endblock %}

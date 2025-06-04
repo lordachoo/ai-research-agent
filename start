@@ -1,0 +1,3 @@
+#!/bin/bash
+echo "Source your venv if needed first."
+python -m app.ui.web_launcher --port=8080 --reload

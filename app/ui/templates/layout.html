@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI Research Agent{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/custom.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    {% block head %}{% endblock %}
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding-top: 20px;
+            padding-bottom: 70px;
+        }
+        .sidebar {
+            background-color: #f8f9fa;
+            min-height: calc(100vh - 40px);
+            padding: 20px;
+            border-right: 1px solid #dee2e6;
+        }
+        .main-content {
+            padding: 20px;
+        }
+        .chat-message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .user-message {
+            background-color: #e9ecef;
+            margin-left: 20%;
+        }
+        .agent-message {
+            background-color: #d1e7dd;
+            margin-right: 20%;
+        }
+        .kb-stats {
+            background-color: #f1f8ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-3 col-xl-2 sidebar">
+                <h4 class="mb-4">AI Research Agent</h4>
+                <div class="list-group mb-4">
+                    <a href="/" class="list-group-item list-group-item-action {% if active_page == 'chat' %}active{% endif %}">
+                        <i class="bi bi-chat"></i> Chat
+                    </a>
+                    <a href="/ui/add-document" class="list-group-item list-group-item-action {% if active_page == 'add-document' %}active{% endif %}">
+                        <i class="bi bi-file-earmark-plus"></i> Add Document
+                    </a>
+                    <a href="/ui/add-url" class="list-group-item list-group-item-action {% if active_page == 'add-url' %}active{% endif %}">
+                        <i class="bi bi-link-45deg"></i> Add URL
+                    </a>
+                    <a href="/ui/scheduler" class="list-group-item list-group-item-action {% if active_page == 'scheduler' %}active{% endif %}">
+                        <i class="bi bi-calendar-event"></i> Schedule Tasks
+                    </a>
+                    <a href="/ui/knowledge-base" class="list-group-item list-group-item-action {% if active_page == 'kb' %}active{% endif %}">
+                        <i class="bi bi-database"></i> Knowledge Base
+                    </a>
+                    <a href="/ui/logs" class="list-group-item list-group-item-action {% if active_page == 'logs' %}active{% endif %}">
+                        <i class="bi bi-terminal"></i> System Logs
+                    </a>
+                </div>
+                
+                <div class="card p-3 mb-3">
+                    <h5>Agent Info</h5>
+                    <div class="small">
+                        <p><strong>Agent:</strong> {{ agent_name }}</p>
+                        <p><strong>Model:</strong> {{ model_name }}</p>
+                        <p><strong>Provider:</strong> {{ llm_provider }}</p>
+                        <p><strong>Temperature:</strong> {{ temperature }}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-9 col-xl-10 main-content">
+                <div class="container">
+                    {% block content %}
+                    {% endblock %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% block scripts %}
+    {% endblock %}
+</body>
+</html>

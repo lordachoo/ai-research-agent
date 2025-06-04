@@ -540,6 +540,36 @@ class SourceScheduler:
             Dictionary of scheduled task information.
         """
         return self.scheduled_tasks
+        
+    def remove_scheduled_task(self, task_id: str) -> str:
+        """
+        Remove a scheduled task.
+        
+        Args:
+            task_id: ID of the task to remove
+            
+        Returns:
+            Message indicating success or failure
+            
+        Raises:
+            ValueError: If the task doesn't exist
+        """
+        if task_id not in self.scheduled_tasks:
+            raise ValueError(f"Task '{task_id}' not found in scheduled tasks")
+            
+        task = self.scheduled_tasks[task_id]
+        job_id = task.get('job_id')
+        
+        # Remove the job from APScheduler
+        if job_id and self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            self.logger.info(f"Removed job {job_id} from APScheduler")
+        
+        # Remove from our tasks dictionary
+        del self.scheduled_tasks[task_id]
+        self.logger.info(f"Removed task {task_id} from scheduled tasks dictionary")
+        
+        return f"Successfully removed scheduled task '{task_id}'"
 
     def shutdown(self):
         """Shut down the scheduler."""

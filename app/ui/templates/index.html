@@ -1,0 +1,212 @@
+{% extends "layout.html" %}
+
+{% block title %}AI Research Agent - Chat{% endblock %}
+
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+    .chat-container {
+        height: calc(100vh - 300px);
+        min-height: 400px;
+        overflow-y: auto;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 20px;
+        background-color: #fafafa;
+    }
+    .chat-message {
+        margin-bottom: 20px;
+        padding: 15px;
+        border-radius: 10px;
+    }
+    .user-message {
+        background-color: #e3f2fd;
+        border-left: 4px solid #1976d2;
+    }
+    .agent-message {
+        background-color: #f5f5f5;
+        border-left: 4px solid #388e3c;
+    }
+    .agent-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        font-size: 0.9rem;
+        color: #666;
+    }
+    .agent-info {
+        display: flex;
+        gap: 15px;
+    }
+    .agent-info span {
+        background-color: #e0e0e0;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+    }
+    .agent-content {
+        line-height: 1.6;
+    }
+    .agent-content pre {
+        background-color: #f8f8f8;
+        border-radius: 5px;
+        padding: 10px;
+        overflow-x: auto;
+        border: 1px solid #e0e0e0;
+        margin: 10px 0;
+        white-space: pre-wrap;
+    }
+    .agent-content code {
+        background-color: rgba(0,0,0,0.05);
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-family: monospace;
+    }
+    .agent-content pre.json {
+        background-color: #f0f8ff;
+        border-left: 3px solid #1976d2;
+    }
+    .agent-content img {
+        max-width: 100%;
+    }
+    .agent-content table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 15px 0;
+    }
+    .agent-content th, .agent-content td {
+        border: 1px solid #ddd;
+        padding: 8px;
+    }
+    .agent-content th {
+        background-color: #f2f2f2;
+    }
+    .agent-content blockquote {
+        border-left: 4px solid #ddd;
+        padding-left: 10px;
+        color: #666;
+        margin: 15px 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Chat with Research Agent</h1>
+<div id="chat-container" class="chat-container mb-4">
+    {% if chat_history %}
+        {% for message in chat_history %}
+            {% if message.role == 'user' %}
+                <div class="chat-message user-message">
+                    <strong>You:</strong>
+                    <div>{{ message.content }}</div>
+                </div>
+            {% else %}
+                <div class="chat-message agent-message">
+                    <div class="agent-header">
+                        <strong>{{ agent_name }}</strong>
+                        <div class="agent-info">
+                            <span>Model: {{ model_name }}</span>
+                            <span>Provider: {{ llm_provider|capitalize }}</span>
+                            <span>Temperature: {{ temperature }}</span>
+                        </div>
+                    </div>
+                    <div class="agent-content markdown-content">{{ message.content }}</div>
+                </div>
+            {% endif %}
+        {% endfor %}
+    {% else %}
+        <div class="alert alert-info">
+            Ask a question to start chatting with the AI Research Agent.
+        </div>
+    {% endif %}
+</div>
+
+<div class="d-flex justify-content-end mb-2">
+    <button id="clear-chat" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-trash"></i> Clear Chat
+    </button>
+</div>
+<form id="chat-form" method="post" action="/ui/chat">
+    <div class="row g-3">
+        <div class="col-md-10">
+            <input type="text" class="form-control" id="query" name="query" placeholder="Ask a question about research or knowledge base..." required>
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-primary w-100" id="submit-btn">Send</button>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        // Process markdown content
+        $('.markdown-content').each(function() {
+            // Get the raw content
+            const rawContent = $(this).text();
+            
+            // Set marked options to respect newlines
+            marked.setOptions({
+                breaks: true,  // Convert newlines to <br>
+                gfm: true      // Use GitHub Flavored Markdown
+            });
+            
+            // Parse and render the markdown content
+            const renderedContent = marked.parse(rawContent);
+            $(this).html(renderedContent);
+            
+            // Add special class to JSON code blocks
+            $(this).find('pre code').each(function() {
+                const content = $(this).text();
+                // Try to detect JSON content
+                try {
+                    JSON.parse(content);
+                    $(this).parent().addClass('json');
+                } catch (e) {
+                    // Not valid JSON, do nothing
+                }
+            });
+        });
+        
+        // Apply syntax highlighting to code blocks
+        document.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightBlock(block);
+        });
+        
+        // Auto-scroll to bottom of chat
+        const chatContainer = document.getElementById('chat-container');
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+        
+        // Add loading indicator on form submission
+        $('#chat-form').submit(function() {
+            $('#submit-btn').html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sending...');
+            $('#submit-btn').prop('disabled', true);
+        });
+        
+        // Handle clear chat button
+        $('#clear-chat').click(function() {
+            if (confirm('Are you sure you want to clear the chat history?')) {
+                // Add loading indicator
+                $(this).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Clearing...');
+                $(this).prop('disabled', true);
+                
+                // Send POST request to clear chat endpoint
+                $.post('/ui/clear-chat', function(data) {
+                    // Reload page on success
+                    window.location.reload();
+                }).fail(function() {
+                    alert('Failed to clear chat history');
+                    // Restore button
+                    $('#clear-chat').html('<i class="bi bi-trash"></i> Clear Chat');
+                    $('#clear-chat').prop('disabled', false);
+                });
+            }
+        });
+    });
+</script>
+{% endblock %}
