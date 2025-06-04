@@ -22,6 +22,10 @@ A customizable AI agent that can be trained on documents to become an expert on 
 
 ## Feature Screenshots
 
+### Chat
+
+![Chat](screenshots/ai-research-agent-chat.png)
+
 ### Add Document
 
 ![Add Document](screenshots/ai-research-agent-add-document.png)
