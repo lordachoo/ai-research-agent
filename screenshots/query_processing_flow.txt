@@ -1,0 +1,47 @@
++------------------+     +------------------+     +----------------------+
+|                  |     |                  |     |                      |
+| User Query       |---->| ResearchAgent    |---->| LLM Provider         |
+| (Chat/CLI/Config)|     | (Orchestrates)   |     | (Ollama or OpenAI)   |
+|                  |     |                  |     |                      |
++------------------+     +--------+---------+     +----------------------+
+                                  |                         ^
+                                  v                         |
+                        +-------------------+               |
+                        | KB Toggle Check   |               |
+                        | use_knowledge_base|               |
+                        +--------+----------+               |
+                                 |                          |
+                  +--------------+---------------+          |
+                  |                              |          |
+                  v                              v          |
+        +------------------+             +----------------+ |
+        |                  |             |                | |
+        | Knowledge Base   |------------>| Direct LLM     |--+
+        | Retrieval        |             | Query          | 
+        |                  |             |                | 
+        +------------------+             +----------------+
+
+Prompt Processing Flow Details:
+
+1. Input Methods:
+   - Chat UI interface (FastAPI web interface)
+   - CLI commands
+   - Scheduled tasks via configuration files
+
+2. Processing Path:
+   - Query goes to ResearchAgent.run() with optional use_knowledge_base parameter
+   - The agent checks the toggle value to determine path:
+     - If true: Queries knowledge base directly, then sends results + query to LLM
+     - If false: Bypasses knowledge base and sends query directly to LLM
+   - LLM selection is based on environment variables:
+     - LLM_PROVIDER: "ollama" or "openai"
+     - If "ollama": Uses OLLAMA_BASE_URL (typically http://localhost:11434) and OLLAMA_MODEL_NAME (e.g., qwen2.5:14b)
+     - If "openai": Uses OpenAI's API with specified API key
+     - Temperature control via TEMPERATURE env variable (0.0 for deterministic output)
+
+3. Scheduled Task Processing:
+   - SourceScheduler manages tasks based on schedule configuration
+   - Tasks can:
+     - Run custom prompts against fetched URL content
+     - Take actions like logging to file or adding to knowledge base
+   - Uses APScheduler to manage recurring tasks

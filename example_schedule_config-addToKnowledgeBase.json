@@ -2,7 +2,7 @@
   "sources": [],
   "scheduled_tasks": [
     {
-      "task_id": "summarize_target_url_to_file",
+      "task_id": "summarize_add_to_kb",
       "task_type": "prompt_on_url",
       "url": "https://en.wikipedia.org/wiki/Placer_mining",
       "prompt_template": "Please provide a concise summary of the main content found at the URL {url}. Focus on the key information and purpose of the page. URL Content: {url_content}",

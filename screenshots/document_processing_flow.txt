@@ -1,0 +1,55 @@
+                                                 +---------------------+
+                                                 |                     |
+                                                 |  Knowledge Base     |
+                                                 |  (ChromaDB)         |
+                                                 |                     |
+                                                 +---------------------+
+                                                    ^         ^
+                                                    |         |
+                                                    |         |
+                                                    |         |
++--------------------+   +--------------------+   +--------------------+
+|                    |   |                    |   |                    |
+| Document Upload    |-->| DocumentRetriever  |-->| Text Splitter     |
+| (PDF, TXT, MD, etc)|   | (Loads & Processes)|   | (Chunk & Process) |
+|                    |   |                    |   |                    |
++--------------------+   +--------------------+   +--------------------+
+                               |
+                               |
+                               v
++--------------------+   +--------------------+
+|                    |   |                    |
+| URL Processing     |-->| Web Content        |
+| (URL + max_depth)  |   | Extraction         |
+|                    |   |                    |
++--------------------+   +---------+----------+
+                                  |
+                                  | (If recursion enabled)
+                                  v
+                         +--------------------+
+                         |                    |
+                         | Link Extraction    |
+                         | (Follow links up   |
+                         |  to max_depth)     |
+                         |                    |
+                         +--------------------+
+
+Document Processing Flow Details:
+
+1. Input Sources:
+   - Document Upload: Local files (PDF, DOCX, TXT, MD, CSV) processed by specific loaders
+   - URL Processing: Web content fetched using WebBaseLoader or RecursiveURLLoader with max_depth
+
+2. Processing Pipeline:
+   - DocumentRetriever loads content based on its type 
+   - Content is split into chunks using RecursiveCharacterTextSplitter (chunks ~1000 chars, overlap 200 chars)
+   - Each chunk gets metadata including:
+     - document_id (URL or file path)
+     - content_hash (SHA256 hash for deduplication)
+     - source information
+     - timestamp
+
+3. Storage (KnowledgeBase):
+   - ChromaDB vector store for persistent storage in ./knowledge_base directory
+   - Deduplication using document_id and content_hash
+   - Old chunks for a document are deleted when updated versions are added

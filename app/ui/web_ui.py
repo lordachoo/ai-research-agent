@@ -6,7 +6,8 @@ This module provides FastAPI routes for HTML-based web interface.
 import os
 import json
 import logging
-from typing import List, Dict, Optional
+import re
+from typing import List, Dict, Optional, Any
 
 from fastapi import APIRouter, Request, Depends, Form, UploadFile, File, Cookie, Response, status
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -38,6 +39,32 @@ templates = Jinja2Templates(directory=templates_path)
 # Initialize session state
 chat_histories = {}  # Simple in-memory cache of chat histories
 
+# Function to get sanitized environment variables for display
+def get_global_settings():
+    """Read environment variables and sanitize sensitive data for display"""
+    # Settings to display (add more as needed)
+    display_settings = {
+        "LLM_PROVIDER": os.getenv("LLM_PROVIDER", "openai"),
+        "TEMPERATURE": os.getenv("TEMPERATURE", "0.0"),
+        "KNOWLEDGE_BASE_DIR": os.getenv("KNOWLEDGE_BASE_DIR", "./knowledge_base"),
+        "MAX_CRAWL_URLS": os.getenv("MAX_CRAWL_URLS", "100"),
+        "MAX_CRAWL_URLS_PER_PAGE": os.getenv("MAX_CRAWL_URLS_PER_PAGE", "50"),
+    }
+    
+    # Add model name based on provider
+    if display_settings["LLM_PROVIDER"].lower() == "ollama":
+        display_settings["MODEL_NAME"] = os.getenv("OLLAMA_MODEL_NAME", "llama3:latest")
+        display_settings["EMBEDDING_MODEL"] = os.getenv("OLLAMA_EMBEDDING_MODEL_NAME", "nomic-embed-text")
+    else:
+        display_settings["MODEL_NAME"] = os.getenv("MODEL_NAME", "")
+        # For OpenAI, don't display the actual API key, just whether it's set
+        if os.getenv("OPENAI_API_KEY"):
+            display_settings["API_KEY_STATUS"] = "Set ✓"
+        else:
+            display_settings["API_KEY_STATUS"] = "Not Set ✗"
+    
+    return display_settings
+
 # UI Routes
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request, agent: ResearchAgent = Depends(get_agent)):
@@ -61,13 +88,15 @@ async def index(request: Request, agent: ResearchAgent = Depends(get_agent)):
         "agent_name": agent.agent_name,
         "model_name": model_name,
         "llm_provider": llm_provider,
-        "temperature": os.getenv("TEMPERATURE", "0.0")
+        "temperature": os.getenv("TEMPERATURE", "0.0"),
+        "global_settings": get_global_settings()
     })
 
 @router.post("/chat", response_class=HTMLResponse)
 async def chat(
     request: Request,
     query: str = Form(...),
+    use_kb: Optional[str] = Form(None),
     agent: ResearchAgent = Depends(get_agent)
 ):
     """Process a chat query and redirect back to the chat interface"""
@@ -80,8 +109,15 @@ async def chat(
     chat_history.append({"role": "user", "content": query})
     
     try:
-        # Get response from agent
-        response = agent.run(query, chat_history)
+        # Determine if knowledge base should be used
+        using_kb = use_kb == "true"
+        
+        # Add KB usage info to query metadata for logging
+        kb_mode = "with KB" if using_kb else "without KB (LLM-only)"
+        logger.info(f"Processing query: '{query}' {kb_mode}")
+        
+        # Get response from agent with KB toggle parameter
+        response = agent.run(query, chat_history, use_knowledge_base=using_kb)
         
         # Extract only the 'output' field from the response JSON if it exists
         if isinstance(response, dict) and 'output' in response:
@@ -89,6 +125,10 @@ async def chat(
         else:
             # Fallback to using the entire response if 'output' field is not found
             agent_response = str(response)
+            
+        # Prepend a notice about KB usage mode
+        kb_notice = f"*[Response generated {'with' if using_kb else 'WITHOUT'} Knowledge Base]*\n\n"
+        agent_response = kb_notice + agent_response
         
         # Add agent response to history
         chat_history.append({"role": "assistant", "content": agent_response})
@@ -143,7 +183,8 @@ async def add_document_form(
         "agent_name": agent.agent_name,
         "model_name": model_name,
         "llm_provider": llm_provider,
-        "temperature": os.getenv("TEMPERATURE", "0.0")
+        "temperature": os.getenv("TEMPERATURE", "0.0"),
+        "global_settings": get_global_settings()
     })
 
 @router.post("/add-document", response_class=HTMLResponse)
@@ -175,7 +216,8 @@ async def process_document(
                     "agent_name": agent.agent_name,
                     "model_name": agent.model_name,
                     "llm_provider": os.getenv("LLM_PROVIDER", "Unknown"),
-                    "temperature": os.getenv("TEMPERATURE", "0.0")
+                    "temperature": os.getenv("TEMPERATURE", "0.0"),
+                    "global_settings": get_global_settings()
                 })
         
         # Learn from the document
@@ -199,7 +241,8 @@ async def process_document(
             "agent_name": agent.agent_name,
             "model_name": model_name,
             "llm_provider": llm_provider,
-            "temperature": os.getenv("TEMPERATURE", "0.0")
+            "temperature": os.getenv("TEMPERATURE", "0.0"),
+            "global_settings": get_global_settings()
         })
     except Exception as e:
         logger.error(f"Error processing document: {str(e)}")
@@ -218,7 +261,8 @@ async def process_document(
             "agent_name": agent.agent_name,
             "model_name": model_name,
             "llm_provider": llm_provider,
-            "temperature": os.getenv("TEMPERATURE", "0.0")
+            "temperature": os.getenv("TEMPERATURE", "0.0"),
+            "global_settings": get_global_settings()
         })
 
 @router.get("/add-url", response_class=HTMLResponse)
@@ -244,7 +288,8 @@ async def add_url_form(
         "agent_name": agent.agent_name,
         "model_name": model_name,
         "llm_provider": llm_provider,
-        "temperature": os.getenv("TEMPERATURE", "0.0")
+        "temperature": os.getenv("TEMPERATURE", "0.0"),
+        "global_settings": get_global_settings()
     })
 
 @router.post("/add-url", response_class=HTMLResponse)
@@ -252,7 +297,11 @@ async def process_url(
     request: Request,
     url: str = Form(...),
     max_depth: int = Form(0),
+    max_urls: int = Form(100),
+    max_urls_per_page: int = Form(50),
+    excluded_domains: Optional[str] = Form(None),
     metadata: Optional[str] = Form(None),
+    use_js: Optional[bool] = Form(False),
     agent: ResearchAgent = Depends(get_agent)
 ):
     """Process a submitted URL"""
@@ -287,25 +336,54 @@ async def process_url(
                     "temperature": os.getenv("TEMPERATURE", "0.0")
                 })
         
-        # Include max_depth in the metadata if it's specified
-        if max_depth > 0 and meta_dict is None:
-            meta_dict = {"max_depth": max_depth}
-            logger.info(f"Setting max_depth={max_depth} in metadata")
-        elif max_depth > 0 and meta_dict is not None:
+        # Initialize metadata dictionary if not provided
+        if meta_dict is None:
+            meta_dict = {}
+            
+        # Include max_depth in the metadata if specified
+        if max_depth > 0:
             meta_dict["max_depth"] = max_depth
-            logger.info(f"Adding max_depth={max_depth} to existing metadata")
+            logger.info(f"Setting max_depth={max_depth} in metadata")
+            
+        # Include max_urls and max_urls_per_page in the metadata
+        meta_dict["max_urls"] = max_urls
+        meta_dict["max_urls_per_page"] = max_urls_per_page
+        logger.info(f"Setting max_urls={max_urls} and max_urls_per_page={max_urls_per_page} in metadata")
+            
+        # Include use_js flag in metadata if checked
+        if use_js:
+            meta_dict["use_js"] = True
+            logger.info(f"Enabling JavaScript rendering for URL: {url}")
+            
+        # Process excluded domains if provided
+        excluded_domains_list = None
+        if excluded_domains and excluded_domains.strip():
+            excluded_domains_list = [domain.strip() for domain in excluded_domains.split(",") if domain.strip()]
+            if excluded_domains_list:
+                logger.info(f"Excluding domains: {', '.join(excluded_domains_list)}")
+                # Store in metadata for display purposes - as a string, not a list
+                # ChromaDB only accepts primitive types, not lists
+                meta_dict["excluded_domains"] = ",".join(excluded_domains_list)
         
         # Log the start of URL processing
         if max_depth > 0:
             logger.info(f"Starting recursive URL processing for {url} with depth {max_depth}")
             logger.info(f"Check the logs page to monitor processing progress")
+            
+            # For recursive processing, call the specific recursive method
+            result = agent.retriever.add_recursive_url_content(
+                url, 
+                max_depth=max_depth, 
+                metadata=meta_dict,
+                excluded_domains=excluded_domains_list
+            )
         else:
             logger.info(f"Processing single URL: {url}")
-            
-        # Call the learn_from_url method with the correct parameters
-        result = agent.learn_from_url(url, meta_dict)
+            # For single URL, use the standard method
+            result = agent.learn_from_url(url, meta_dict)
         
         logger.info(f"URL processing complete: {url}")
+
         
         # Determine the correct model name to display based on provider
         llm_provider = os.getenv("LLM_PROVIDER", "openai").lower()
@@ -322,7 +400,8 @@ async def process_url(
             "agent_name": agent.agent_name,
             "model_name": model_name,
             "llm_provider": llm_provider,
-            "temperature": os.getenv("TEMPERATURE", "0.0")
+            "temperature": os.getenv("TEMPERATURE", "0.0"),
+            "global_settings": get_global_settings()
         })
     except Exception as e:
         error_msg = str(e)
@@ -343,7 +422,8 @@ async def process_url(
             "agent_name": agent.agent_name,
             "model_name": model_name,
             "llm_provider": llm_provider,
-            "temperature": os.getenv("TEMPERATURE", "0.0")
+            "temperature": os.getenv("TEMPERATURE", "0.0"),
+            "global_settings": get_global_settings()
         })
 
 @router.get("/knowledge-base", response_class=HTMLResponse)
@@ -351,6 +431,7 @@ async def knowledge_base(
     request: Request,
     search: Optional[str] = None,
     refresh: Optional[int] = None,
+    document_id: Optional[str] = None,
     agent: ResearchAgent = Depends(get_agent)
 ):
     """Render the knowledge base page"""
@@ -359,6 +440,25 @@ async def knowledge_base(
     
     # Search results
     search_results = []
+    document_chunks = []
+    all_documents = {}
+    
+    # If document_id is provided, get chunks for that document
+    if document_id:
+        try:
+            document_chunks = agent.knowledge_base.get_document_chunks(document_id)
+            logger.info(f"Retrieved {len(document_chunks)} chunks for document: {document_id}")
+        except Exception as e:
+            logger.error(f"Error retrieving document chunks: {str(e)}")
+    # Otherwise get all document IDs for browsing
+    else:
+        try:
+            all_documents = agent.knowledge_base.get_all_documents()
+            logger.info(f"Retrieved {len(all_documents)} documents from knowledge base")
+        except Exception as e:
+            logger.error(f"Error retrieving document list: {str(e)}")
+    
+    # If search is provided, perform search
     if search:
         try:
             # Use similarity_search instead of search
@@ -384,10 +484,14 @@ async def knowledge_base(
         "kb_stats": kb_stats,
         "search_term": search,
         "search_results": search_results,
+        "document_id": document_id,
+        "document_chunks": document_chunks,
+        "all_documents": all_documents,
         "agent_name": agent.agent_name,
         "model_name": model_name,
         "llm_provider": llm_provider,
-        "temperature": os.getenv("TEMPERATURE", "0.0")
+        "temperature": os.getenv("TEMPERATURE", "0.0"),
+        "global_settings": get_global_settings()
     })
 
 @router.get("/scheduler", response_class=HTMLResponse)
@@ -434,7 +538,8 @@ async def scheduler(
         "agent_name": agent.agent_name,
         "model_name": model_name,
         "llm_provider": llm_provider,
-        "temperature": os.getenv("TEMPERATURE", "0.0")
+        "temperature": os.getenv("TEMPERATURE", "0.0"),
+        "global_settings": get_global_settings()
     })
 
 @router.post("/scheduler/source/remove")
@@ -578,5 +683,6 @@ async def log_viewer(request: Request, agent: ResearchAgent = Depends(get_agent)
         "agent_name": agent.agent_name,
         "model_name": model_name,
         "llm_provider": llm_provider,
-        "temperature": os.getenv("TEMPERATURE", "0.0")
+        "temperature": os.getenv("TEMPERATURE", "0.0"),
+        "global_settings": get_global_settings()
     })

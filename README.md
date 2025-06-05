@@ -34,6 +34,23 @@ A customizable AI agent that can be trained on documents to become an expert on 
 
 ![Add URL Content](screenshots/ai-research-agent-add-url-content.png)
 
+#### Recursive URL Crawling Options
+
+When setting a recursion depth greater than 0, the following safety limits apply:
+
+- **Max URLs to Crawl** (default: 100): Maximum total number of URLs to process across all pages
+- **Max URLs Per Page** (default: 50): Maximum number of links to follow from any single page
+
+These limits help prevent excessive crawling and can be configured in three ways (in order of precedence):
+
+1. **Per Request**: Set through the web UI when adding URL content
+2. **Globally**: Configure in your `.env` file using the variables:
+   ```
+   MAX_CRAWL_URLS=100       # Maximum total URLs
+   MAX_CRAWL_URLS_PER_PAGE=50  # Maximum links per page
+   ```
+3. **Defaults**: If not specified in the UI or environment, defaults to 100 and 50 respectively
+
 ### Knowledge Base Search
 
 ![Knowledge Base](screenshots/ai-research-agent-knowledge-base-search.png)
@@ -121,6 +138,64 @@ python -m app.main web --port 8501
 
 You can add information to the agent's knowledge base from local files or URLs.
 
+#### Document Processing Flow
+
+```
+                                                 +---------------------+
+                                                 |                     |
+                                                 |  Knowledge Base     |
+                                                 |  (ChromaDB)         |
+                                                 |                     |
+                                                 +---------------------+
+                                                    ^         ^
+                                                    |         |
+                                                    |         |
+                                                    |         |
++--------------------+   +--------------------+   +--------------------+
+|                    |   |                    |   |                    |
+| Document Upload    |-->| DocumentRetriever  |-->| Text Splitter     |
+| (PDF, TXT, MD, etc)|   | (Loads & Processes)|   | (Chunk & Process) |
+|                    |   |                    |   |                    |
++--------------------+   +--------------------+   +--------------------+
+                               |
+                               |
+                               v
++--------------------+   +--------------------+
+|                    |   |                    |
+| URL Processing     |-->| Web Content        |
+| (URL + max_depth)  |   | Extraction         |
+|                    |   |                    |
++--------------------+   +---------+----------+
+                                  |
+                                  | (If recursion enabled)
+                                  v
+                         +--------------------+
+                         |                    |
+                         | Link Extraction    |
+                         | (Follow links up   |
+                         |  to max_depth)     |
+                         |                    |
+                         +--------------------+
+```
+
+The document processing pipeline uses these key steps:
+
+1. **Input Sources**:
+   - Document Upload: Local files (PDF, DOCX, TXT, MD, CSV) processed by specific loaders
+   - URL Processing: Web content fetched using WebBaseLoader or RecursiveURLLoader with max_depth
+
+2. **Processing Pipeline**:
+   - DocumentRetriever loads content based on its type 
+   - Content is split into chunks using RecursiveCharacterTextSplitter (chunks ~1000 chars, overlap 200 chars)
+   - Each chunk gets metadata including document_id, content_hash, source information, and timestamp
+
+3. **Storage (KnowledgeBase)**:
+   - ChromaDB vector store for persistent storage in ./knowledge_base directory
+   - Deduplication using document_id and content_hash
+   - Old chunks for a document are deleted when updated versions are added
+
+The agent provides multiple ways to add content to the knowledge base: from local files or URLs.
+
 #### Using the `add_docs.sh` script (Recommended for local files)
 
 A convenience script `add_docs.sh` is provided in the project root to simplify adding local documents (single files or entire directories).
@@ -155,7 +230,9 @@ To add content from a specific URL:
 ```bash
 python -m app.main add-url https://example.com/article --depth 1 --metadata '{"source": "website", "topic": "specific article"}'
 ```
-*   `--depth`: Specifies the recursion depth for linked pages (optional, default depends on implementation).
+*   `--depth`: Specifies the recursion depth for linked pages (optional, default is 0, which means no recursion).
+*   `--max-urls`: Maximum number of total URLs to crawl (optional, default is 100).
+*   `--max-urls-per-page`: Maximum number of links to follow from each page (optional, default is 50).
 *   `--metadata`: Optional JSON string for metadata.
 
 ### API Usage
@@ -204,12 +281,14 @@ Create a JSON configuration file (see `sample_config.json`) to schedule sources:
 
 The configuration file can also define **Scheduled Tasks**, which allow you to periodically execute a specific prompt against content fetched from a URL and then perform an action with the agent's output.
 
+For two uploadable examples see `example_schedule_config-addToKnowledgeBase.json` and `example_schedule_config-logToFile.json`.
+
 Add a `scheduled_tasks` array to your JSON configuration. Each object in this array defines a task:
 
 ```json
 {
   "sources": [
-    // ... your existing sources for populating the knowledge base ...
+    /* Your existing sources for populating the knowledge base would go here */
   ],
   "scheduled_tasks": [
     {
@@ -217,20 +296,24 @@ Add a `scheduled_tasks` array to your JSON configuration. Each object in this ar
       "task_type": "prompt_on_url",
       "url": "https://target-url.com/page_to_analyze",
       "prompt_template": "Based on the content from {url}, please summarize the key points. URL Content: {url_content}",
-      "interval_minutes": 1440, // Or use "cron_expression": "0 9 * * *"
+      "interval_minutes": 1440,
       "output_action": {
-        "type": "log_to_file", // or "add_to_knowledge_base"
-        "filepath": "./task_outputs/my_task_log.txt" // For log_to_file
-        // "document_title": "Analysis of {url} - {date}", // For add_to_knowledge_base
-        // "metadata": { "custom_key": "custom_value" } // Optional, for add_to_knowledge_base
+        "type": "log_to_file",
+        "filepath": "./task_outputs/my_task_log.txt"
       },
-      "metadata": { // Optional metadata for the task itself
+      "metadata": {
         "description": "Daily analysis of target-url.com."
       }
     }
   ]
 }
 ```
+
+Notes about the configuration:
+- For scheduling, use either `interval_minutes` or `cron_expression` (e.g., "0 9 * * *" for daily at 9 AM)
+- For `output_action`, use one of these types:
+  - `log_to_file`: Saves output to the specified filepath
+  - `add_to_knowledge_base`: Adds the output to your knowledge base with optional `document_title` and `metadata`
 
 **Scheduled Task Parameters:**
 
@@ -265,7 +348,45 @@ python -m app.main schedule sample_config.json
 
 ## Agent Prompt Processing Flow
 
-When you send a prompt to the AI Research Agent (either via the CLI or the API), the following sequence of events typically occurs, especially when configured to use a local LLM provider like Ollama with a ReAct-style agent:
+```
++------------------+     +------------------+     +----------------------+
+|                  |     |                  |     |                      |
+| User Query       |---->| ResearchAgent    |---->| LLM Provider         |
+| (Chat/CLI/Config)|     | (Orchestrates)   |     | (Ollama or OpenAI)   |
+|                  |     |                  |     |                      |
++------------------+     +--------+---------+     +----------------------+
+                                 |                         ^
+                                 | (Knowledge needed?)     |
+                                 v                         |
+                        +------------------+               |
+                        |                  |               |
+                        | Knowledge Base   |---------------+
+                        | Retrieval        |
+                        |                  |
+                        +------------------+
+```
+
+**Prompt Processing Flow Details**:
+
+1. **Input Methods**:
+   - Chat UI interface (FastAPI web interface)
+   - CLI commands
+   - Scheduled tasks via configuration files
+
+2. **Processing Path**:
+   - Query goes to ResearchAgent, which determines if knowledge base access is needed
+   - If needed, relevant documents are retrieved from ChromaDB vector store
+   - LLM selection is based on environment variables:
+     - `LLM_PROVIDER`: "ollama" or "openai"
+     - If "ollama": Uses `OLLAMA_BASE_URL` and `OLLAMA_MODEL_NAME`
+     - If "openai": Uses OpenAI's API with specified API key
+     - Temperature control via `TEMPERATURE` env variable (0.0 for deterministic output)
+
+3. **Scheduled Task Processing**:
+   - SourceScheduler manages tasks based on schedule configuration
+   - Tasks can run custom prompts against fetched URL content and take actions
+
+The AI Research Agent uses a multi-step flow when processing prompts. It supports explicit toggling of the knowledge base via the `use_knowledge_base` parameter:
 
 1.  **Prompt Reception**: Your input prompt is received by the `app/main.py` script (if using CLI) or the `app/api.py` (if using API).
 2.  **Agent Initialization**: The `ResearchAgent` (from `app/core/agent.py`) is set up. This involves:
@@ -296,7 +417,33 @@ When you send a prompt to the AI Research Agent (either via the CLI or the API),
 5.  **Final Answer Generation**: Once the LLM outputs a "Final Answer" in its response, the agent executor stops the loop.
 6.  **Response Delivery**: This final answer is returned by the `agent_executor` and then displayed to you via the CLI or API response.
 
-This flow allows the agent to dynamically decide when and how to use its knowledge base (or other tools) to best answer your questions, leveraging the reasoning capabilities of the LLM.
+### Knowledge Base Toggle
+
+The agent supports explicit toggling of the knowledge base retrieval with the `use_knowledge_base` parameter in the `ResearchAgent.run()` method. This allows you to control whether the agent uses the knowledge base or relies solely on the LLM's built-in knowledge.
+
+- When enabled (`use_knowledge_base=True`), the agent queries the knowledge base for relevant context and includes this in the prompt to the LLM.
+- When disabled (`use_knowledge_base=False`), the agent sends queries directly to the LLM without retrieving information from the knowledge base.
+
+This toggle is useful for:
+- Testing the impact of the knowledge base on response quality
+- Isolating built-in model knowledge from specific domain knowledge
+- Reducing computational overhead when knowledge base context isn't needed
+
+### Testing Knowledge Base Toggle
+
+A test script is provided to compare agent responses with and without knowledge base enabled:
+
+```bash
+python tools/llmAblationTest.py -q "Your test question here"
+```
+
+Options:
+- `-q/--queries`: One or more queries to test (default: a set of predefined test queries)
+- `--no-diff`: Disable showing the differences between responses
+
+The script will run each query twice (with and without knowledge base), time each response, and display the results side-by-side with a word-level difference analysis.
+
+This tool is essential for validating that the knowledge base is working correctly and for understanding how the agent's knowledge from the KB differs from the LLM's built-in knowledge.
 
 ## Project Structure
 
@@ -314,6 +461,8 @@ ai-research-agent/
 │   ├── api.py               # FastAPI interface
 │   └── main.py              # CLI interface
 ├── knowledge_base/          # Default storage location (Created first time you run the app)
+├── tools/                   # Utility scripts
+│   └── llmAblationTest.py   # Script to test KB toggle functionality
 ├── .env.example             # Environment variables template
 ├── requirements.txt         # Dependencies
 ├── sample_config.json       # Example source configuration

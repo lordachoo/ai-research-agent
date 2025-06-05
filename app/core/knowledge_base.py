@@ -255,3 +255,66 @@ class KnowledgeBase:
             return stats
         except Exception as e:
             return {"error": str(e), "document_count": 0, "chunk_count": 0}
+            
+    def get_all_documents(self) -> Dict[str, List]:
+        """
+        Get all document IDs in the knowledge base, sorted alphabetically.
+        
+        Returns:
+            Dictionary with document IDs as keys and their titles/counts as values
+        """
+        try:
+            collection_data = self.vector_store.get()
+            document_map = {}
+            
+            if "ids" in collection_data and collection_data["ids"]:
+                for i, meta in enumerate(collection_data["metadatas"]):
+                    if meta and "document_id" in meta:
+                        doc_id = meta["document_id"]
+                        title = meta.get("title", doc_id)
+                        
+                        if doc_id not in document_map:
+                            document_map[doc_id] = {
+                                "title": title,
+                                "chunk_count": 0,
+                                "created_at": meta.get("timestamp", "")
+                            }
+                        document_map[doc_id]["chunk_count"] += 1
+            
+            # Sort alphabetically by document ID
+            sorted_docs = dict(sorted(document_map.items()))
+            return sorted_docs
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Error getting all documents: {str(e)}", exc_info=True)
+            return {}
+    
+    def get_document_chunks(self, document_id: str) -> List[Dict[str, Any]]:
+        """
+        Get all chunks for a specific document ID.
+        
+        Args:
+            document_id: The document ID to get chunks for
+            
+        Returns:
+            List of chunks (content and metadata) for the document
+        """
+        try:
+            collection_data = self.vector_store.get()
+            chunks = []
+            
+            if "ids" in collection_data and collection_data["ids"]:
+                for i, meta in enumerate(collection_data["metadatas"]):
+                    if meta and "document_id" in meta and meta["document_id"] == document_id:
+                        chunks.append({
+                            "id": collection_data["ids"][i],
+                            "content": collection_data["documents"][i],
+                            "metadata": meta
+                        })
+            
+            # Sort chunks by page number or order if available
+            return chunks
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Error getting document chunks: {str(e)}", exc_info=True)
+            return []

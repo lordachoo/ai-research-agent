@@ -58,7 +58,7 @@
                         <i class="bi bi-file-earmark-plus"></i> Add Document
                     </a>
                     <a href="/ui/add-url" class="list-group-item list-group-item-action {% if active_page == 'add-url' %}active{% endif %}">
-                        <i class="bi bi-link-45deg"></i> Add URL
+                        <i class="bi bi-link-45deg"></i> Add URL(s) (Crawler)
                     </a>
                     <a href="/ui/scheduler" class="list-group-item list-group-item-action {% if active_page == 'scheduler' %}active{% endif %}">
                         <i class="bi bi-calendar-event"></i> Schedule Tasks
@@ -75,9 +75,20 @@
                     <h5>Agent Info</h5>
                     <div class="small">
                         <p><strong>Agent:</strong> {{ agent_name }}</p>
-                        <p><strong>Model:</strong> {{ model_name }}</p>
+                        <!--<p><strong>Model:</strong> {{ model_name }}</p>
                         <p><strong>Provider:</strong> {{ llm_provider }}</p>
-                        <p><strong>Temperature:</strong> {{ temperature }}</p>
+                        <p><strong>Temperature:</strong> {{ temperature }}</p>-->
+                    </div>
+                    
+                    <h5 class="mt-3">Global Settings</h5>
+                    <div class="small">
+                        {% if global_settings %}
+                            {% for key, value in global_settings.items() %}
+                                <p><strong>{{ key }}:</strong> {{ value }}</p>
+                            {% endfor %}
+                        {% else %}
+                            <p>No global settings found</p>
+                        {% endif %}
                     </div>
                 </div>
             </div>

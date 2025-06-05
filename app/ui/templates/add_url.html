@@ -21,8 +21,34 @@
             
             <div class="mb-3">
                 <label for="max_depth" class="form-label">Recursion Depth</label>
-                <input type="number" class="form-control" id="max_depth" name="max_depth" value="0" min="0" max="3">
-                <div class="form-text">0 = current page only, 1-3 = follow links recursively</div>
+                <input type="number" class="form-control" id="max_depth" name="max_depth" value="0" min="0" max="10">
+                <div class="form-text">0 = current page only, 1-10 = follow links recursively (higher values may take longer)</div>
+            </div>
+            
+            <!-- Advanced Crawling Options - Displayed only when recursion depth > 0 -->
+            <div id="crawling-options" class="mb-3 border rounded p-3" style="display:none;">
+                <h5>Crawling Limits</h5>
+                <div class="mb-3">
+                    <label for="max_urls" class="form-label">Max URLs to Crawl</label>
+                    <input type="number" class="form-control" id="max_urls" name="max_urls" value="100" min="1" max="500">
+                    <div class="form-text">Maximum number of URLs to crawl in total (default: 100)</div>
+                </div>
+                <div class="mb-3">
+                    <label for="max_urls_per_page" class="form-label">Max URLs Per Page</label>
+                    <input type="number" class="form-control" id="max_urls_per_page" name="max_urls_per_page" value="50" min="1" max="200">
+                    <div class="form-text">Maximum number of links to follow from each page (default: 50)</div>
+                </div>
+                <div class="mb-3">
+                    <label for="excluded_domains" class="form-label">Excluded Domains</label>
+                    <input type="text" class="form-control" id="excluded_domains" name="excluded_domains" placeholder="books.google.com,example.com">
+                    <div class="form-text">Comma-separated list of domains to exclude from crawling</div>
+                </div>
+            </div>
+            
+            <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="use_js" name="use_js" value="true">
+                <label class="form-check-label" for="use_js">Use Enhanced Content Extraction</label>
+                <div class="form-text">Enable for better extraction of main content, filtering out navigation, ads, and other non-essential elements</div>
             </div>
             
             <div class="mb-3">
@@ -45,11 +71,30 @@
 {% block scripts %}
 <script>
     $(document).ready(function() {
+        // Toggle crawling options based on recursion depth
+        const maxDepthInput = document.getElementById('max_depth');
+        const crawlingOptions = document.getElementById('crawling-options');
+        
+        function updateCrawlingOptions() {
+            if (parseInt(maxDepthInput.value) > 0) {
+                $(crawlingOptions).show();
+            } else {
+                $(crawlingOptions).hide();
+            }
+        }
+        
+        // Initial check
+        updateCrawlingOptions();
+        
+        // Check on change
+        $(maxDepthInput).on('change keyup', updateCrawlingOptions);
+        
+        // Form submission handling
         $('#url-form').submit(function() {
             try {
                 // Validate JSON if provided
                 const metadata = $('#metadata').val();
-                if (metadata && metadata.trim() !== '') {
+                if (metadata) {
                     JSON.parse(metadata);
                 }
                 

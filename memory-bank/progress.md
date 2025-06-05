@@ -4,11 +4,23 @@
 1.  **Core Agent & LLM Interaction**:
     *   `ResearchAgent` can successfully invoke LLMs (Ollama local models, OpenAI cloud models) for prompt execution.
     *   LLM `TEMPERATURE` is configurable via `.env` and correctly passed to the LLM, enabling deterministic output (critical for content hashing).
+    *   **Knowledge Base Toggle**: Implemented robust functionality to enable/disable knowledge base usage via the `use_knowledge_base` parameter in `ResearchAgent.run()`. When disabled, the agent uses direct LLM calls without KB retrieval.
 2.  **Information Ingestion**:
-    *   Fetching and parsing content from URLs using LangChain's `WebBaseLoader`.
-    *   Loading local documents (tested with various types, functionality provided by LangChain loaders).
+    *   **Enhanced URL Content Extraction**:
+        *   Improved content extraction using advanced BeautifulSoup parsing to filter out navigation, ads, and other non-essential elements
+        *   UI option for enabling enhanced extraction on a per-URL basis
+    *   **Unrestricted URL Recursion**:
+        *   Removed domain restriction to follow links across different domains
+        *   Eliminated arbitrary 10-link limit per page
+        *   Increased max recursion depth from 3 to 10 in the UI
+    *   Fetching and parsing content from URLs using LangChain's `WebBaseLoader`
+    *   Loading local documents (tested with various types, functionality provided by LangChain loaders)
 3.  **Knowledge Base**:
     *   Persistent knowledge base using ChromaDB, storing document chunks and their embeddings.
+    *   **Enhanced Knowledge Base UI**:
+        *   Collapsible metadata sections for each search result
+        *   Comprehensive table view showing all available metadata fields
+        *   Improved layout for better readability and information access
     *   **Advanced Deduplication & Update Logic**:
         *   `KnowledgeBase.add_documents` successfully uses `document_id` (URL) and `content_hash` (SHA256 of LLM summary) for managing entries.
         *   Skips adding summaries if the exact URL and content hash already exist.
@@ -33,7 +45,13 @@
     *   This Memory Bank (`/memory-bank` directory with Markdown files) is being established.
 
 ## What's Left to Build / Next Major Steps
-1.  **Thorough Deduplication Testing (Ongoing)**:
+1.  **URL Recursion and Content Extraction Testing**:
+    *   Test Wikipedia recursion with the improved link following logic (no domain restriction)
+    *   Monitor performance with higher recursion depths (may need pagination or background processing)
+    *   Consider adding more filtering options to control which links are followed
+    *   Continue evaluating and refining the BeautifulSoup-based content extraction approach for more complex sites
+
+2.  **Thorough Deduplication Testing (Ongoing)**:
     *   Systematically test the add/skip/update scenarios for `add_to_knowledge_base` to confirm flawless operation.
     *   Investigate any lingering anomalies (like the "already exists in DB" message on a supposedly fresh KB).
 2.  **arXiv Integration**: While `SourceScheduler` has placeholders, the actual arXiv fetching and processing logic needs full implementation and testing if it's a priority.
@@ -47,8 +65,11 @@
 7.  **Unit & Integration Tests**: Develop a suite of tests to ensure reliability and prevent regressions.
 
 ## Current Status
--   The core functionality for scheduled "prompt-on-URL" tasks with intelligent knowledge base integration (deduplication and updates) is largely complete and in the process of final testing.
--   The foundational "Memory Bank" documentation structure is being created.
+-   Knowledge Base UI has been enhanced with comprehensive metadata display in a collapsible format.
+-   URL recursion has been improved by removing domain restrictions and link limits, allowing for more thorough web content exploration.
+-   Enhanced content extraction using advanced BeautifulSoup parsing has been implemented as an alternative to basic extraction.
+-   The core functionality for scheduled "prompt-on-URL" tasks with intelligent knowledge base integration (deduplication and updates) is complete and in the process of final testing.
+-   The foundational "Memory Bank" documentation structure has been created and is being maintained.
 -   The project is stable enough for focused testing of the knowledge base features.
 
 ## Known Issues & Observations

@@ -46,8 +46,12 @@ The AI Research Agent is a Python-based application with a modular architecture.
     7.  `KnowledgeBase.add_documents()` is called.
     8.  `KnowledgeBase` performs deduplication/update logic using metadata filters against ChromaDB, then adds/skips/updates chunks.
 -   **Querying the Knowledge Base**:
-    1.  User issues a query via CLI.
-    2.  `app.main.py` calls `ResearchAgent.query()`.
-    3.  `ResearchAgent` (potentially) uses a retriever built from `KnowledgeBase.get_retriever()` to find relevant document chunks.
-    4.  Relevant chunks are passed as context to the LLM with the query.
-    5.  LLM generates an answer.
+    1.  User issues a query via CLI, Web UI or API.
+    2.  `app.main.py` calls `ResearchAgent.run()` with optional `use_knowledge_base` parameter.
+    3.  If knowledge base is enabled:
+        - The agent directly queries the knowledge base using the KB tool
+        - Retrieved KB results are incorporated into a prompt sent to the LLM
+    4.  If knowledge base is disabled:
+        - The agent bypasses KB retrieval and sends the query directly to the LLM
+        - No KB context is included in the prompt
+    5.  LLM generates an answer based on available context (with or without KB).
